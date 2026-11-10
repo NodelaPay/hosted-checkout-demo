@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { CartProvider } from "@/modules/cart-ui/cart-context";
+import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Project Scaffold",
-  description: "Next.js project scaffold",
+  title: "Cyber — Technology Store",
+  description: "Shop phones, computers, wearables, and more.",
 };
 
 export default function RootLayout({
@@ -11,7 +13,9 @@ export default function RootLayout({
 }: Readonly<{ children: ReactNode }>) {
   return (
     <html lang="en">
-      <body>{children}</body>
+      <body>
+        <CartProvider>{children}</CartProvider>
+      </body>
     </html>
   );
 }

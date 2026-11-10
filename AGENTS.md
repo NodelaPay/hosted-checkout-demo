@@ -7,4 +7,4 @@
 - Use strict TypeScript. Avoid `any` and unchecked casts. Use classes where they improve cohesion, lifecycle management, or dependency injection; simple pure helpers may remain functions.
 - Keep controllers thin: parse input, call a service, and map its result to HTTP. Put business rules in services and persistence details in repositories.
 - Add module tables to the Drizzle schema glob and commit generated migrations with schema changes.
-- No checkout domain or UI implementation has been specified yet. Do not infer one from the repository name.
+- The current storefront and checkout flow are frontend-only views using local demo data. Do not treat their demo interactions as payment processing or persisted domain behavior.
