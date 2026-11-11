@@ -9,8 +9,8 @@ export function SiteFooter() {
         <div>
           <Logo inverse />
           <p className="mt-4 max-w-[390px] text-[14px] leading-7 text-[#b6b2b2] md:mt-6">
-            We are a residential interior design firm located in Portland. Our
-            boutique-studio offers more than just design.
+            Explore phones, computers, wearables, and the accessories that make
+            every day better in our demo technology storefront.
           </p>
           <div className="mt-8 flex gap-8 text-white md:mt-14">
             <Globe size={17} />

@@ -3,24 +3,26 @@
 import Link from "next/link";
 import { SlidersHorizontal } from "lucide-react";
 import { useMemo, useState } from "react";
-import { catalogService } from "../service";
+import type { ProductDto } from "../product.dto";
 import { emptyFilters, FilterPanel, type FilterState } from "./filter-panel";
 import { ProductCard } from "@/modules/storefront/components/product-card";
 
 export function ProductsView({
+  products: catalogProducts,
   initialQuery = "",
   initialCategory = "",
   initialFilters = emptyFilters,
 }: {
+  products: readonly ProductDto[];
   initialQuery?: string;
   initialCategory?: string;
   initialFilters?: FilterState;
 }) {
   const [filters, setFilters] = useState<FilterState>(initialFilters);
-  const [sort, setSort] = useState("rating");
+  const [sort, setSort] = useState("default");
   const [showAll, setShowAll] = useState(false);
   const products = useMemo(() => {
-    const matching = catalogService.list().filter((product) => {
+    const matching = catalogProducts.filter((product) => {
       if (
         initialQuery &&
         !product.name.toLowerCase().includes(initialQuery.toLowerCase())
@@ -42,7 +44,14 @@ export function ProductsView({
           ? b.price - a.price
           : 0,
     );
-  }, [filters, initialCategory, initialQuery, sort]);
+  }, [catalogProducts, filters, initialCategory, initialQuery, sort]);
+  const mobileFilterQuery = new URLSearchParams();
+  if (initialQuery) mobileFilterQuery.set("q", initialQuery);
+  if (initialCategory) mobileFilterQuery.set("category", initialCategory);
+  if (filters.brand) mobileFilterQuery.set("brand", filters.brand);
+  if (filters.memory) mobileFilterQuery.set("memory", filters.memory);
+  if (filters.minPrice) mobileFilterQuery.set("min", filters.minPrice);
+  if (filters.maxPrice) mobileFilterQuery.set("max", filters.maxPrice);
 
   return (
     <main>
@@ -55,12 +64,16 @@ export function ProductsView({
       </div>
       <div className="mx-auto flex max-w-[1120px] gap-8 px-4 pb-20 pt-10 md:pt-0 lg:px-0">
         <aside className="hidden w-[256px] shrink-0 md:block">
-          <FilterPanel value={filters} onChange={setFilters} />
+          <FilterPanel
+            products={catalogProducts}
+            value={filters}
+            onChange={setFilters}
+          />
         </aside>
         <div className="min-w-0 flex-1">
           <div className="mb-5 flex gap-4 md:items-center md:justify-between">
             <Link
-              href="/products/filters"
+              href={`/products/filters?${mobileFilterQuery.toString()}`}
               className="flex h-14 flex-1 items-center justify-between rounded-lg border border-[#ddd] px-4 md:hidden"
             >
               Filters
@@ -76,7 +89,7 @@ export function ProductsView({
               onChange={(event) => setSort(event.target.value)}
               className="h-14 flex-1 rounded-lg border border-[#ddd] bg-white px-4 text-sm outline-none md:max-w-[250px]"
             >
-              <option value="rating">By rating</option>
+              <option value="default">Default order</option>
               <option value="price-low">Price: Low to High</option>
               <option value="price-high">Price: High to Low</option>
             </select>

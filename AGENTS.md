@@ -7,4 +7,5 @@
 - Use strict TypeScript. Avoid `any` and unchecked casts. Use classes where they improve cohesion, lifecycle management, or dependency injection; simple pure helpers may remain functions.
 - Keep controllers thin: parse input, call a service, and map its result to HTTP. Put business rules in services and persistence details in repositories.
 - Add module tables to the Drizzle schema glob and commit generated migrations with schema changes.
-- The current storefront and checkout flow are frontend-only views using local demo data. Do not treat their demo interactions as payment processing or persisted domain behavior.
+- The storefront uses PostgreSQL for products, blog posts, reviews, guest carts, favorites, addresses, contact messages, and pending orders. Redis provides caching and rate limiting.
+- No payment provider is connected. Orders remain pending payment, and card details must not be collected until a payment provider is integrated.

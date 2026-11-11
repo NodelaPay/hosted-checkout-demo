@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
 import { CartProvider } from "@/modules/cart-ui/cart-context";
+import { FavoritesProvider } from "@/modules/favorites-ui/favorites-context";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -14,7 +15,9 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <CartProvider>{children}</CartProvider>
+        <CartProvider>
+          <FavoritesProvider>{children}</FavoritesProvider>
+        </CartProvider>
       </body>
     </html>
   );

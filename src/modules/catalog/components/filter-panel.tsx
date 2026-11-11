@@ -1,19 +1,8 @@
 "use client";
 
 import { Search } from "lucide-react";
-
-const brands = [
-  "Apple",
-  "Samsung",
-  "Xiaomi",
-  "Poco",
-  "OPPO",
-  "Honor",
-  "Motorola",
-  "Nokia",
-  "Realme",
-];
-const memories = ["16GB", "32GB", "64GB", "128GB", "256GB", "512GB", "1TB"];
+import { useState } from "react";
+import type { ProductDto } from "../product.dto";
 
 export interface FilterState {
   readonly brand: string;
@@ -30,11 +19,26 @@ export const emptyFilters: FilterState = {
 };
 
 interface FilterPanelProps {
+  readonly products: readonly ProductDto[];
   readonly value: FilterState;
   readonly onChange: (value: FilterState) => void;
 }
 
-export function FilterPanel({ value, onChange }: FilterPanelProps) {
+export function FilterPanel({ products, value, onChange }: FilterPanelProps) {
+  const [brandSearch, setBrandSearch] = useState("");
+  const [memorySearch, setMemorySearch] = useState("");
+  const brands = [...new Set(products.map((product) => product.brand))]
+    .filter((brand) => brand.toLowerCase().includes(brandSearch.toLowerCase()))
+    .sort();
+  const memories = [
+    ...new Set(
+      products.flatMap((product) => (product.memory ? [product.memory] : [])),
+    ),
+  ]
+    .filter((memory) =>
+      memory.toLowerCase().includes(memorySearch.toLowerCase()),
+    )
+    .sort();
   const update = (key: keyof FilterState, next: string) =>
     onChange({ ...value, [key]: next });
 
@@ -87,7 +91,13 @@ export function FilterPanel({ value, onChange }: FilterPanelProps) {
         </summary>
         <div className="mb-4 flex items-center gap-2 rounded-lg bg-[#f5f5f5] px-3 py-2 text-[#aaa]">
           <Search size={16} />
-          <span>Search</span>
+          <input
+            aria-label="Search brands"
+            placeholder="Search"
+            value={brandSearch}
+            onChange={(event) => setBrandSearch(event.target.value)}
+            className="w-full bg-transparent outline-none"
+          />
         </div>
         <div className="max-h-56 space-y-3 overflow-auto">
           {brands.map((brand) => (
@@ -105,7 +115,7 @@ export function FilterPanel({ value, onChange }: FilterPanelProps) {
               />
               <span>{brand}</span>
               <small className="text-[#aaa]">
-                {brand === "Apple" ? "110" : brand === "Samsung" ? "125" : "68"}
+                {products.filter((product) => product.brand === brand).length}
               </small>
             </label>
           ))}
@@ -117,7 +127,13 @@ export function FilterPanel({ value, onChange }: FilterPanelProps) {
         </summary>
         <div className="mb-4 flex items-center gap-2 rounded-lg bg-[#f5f5f5] px-3 py-2 text-[#aaa]">
           <Search size={16} />
-          <span>Search</span>
+          <input
+            aria-label="Search memory sizes"
+            placeholder="Search"
+            value={memorySearch}
+            onChange={(event) => setMemorySearch(event.target.value)}
+            className="w-full bg-transparent outline-none"
+          />
         </div>
         <div className="max-h-48 space-y-3 overflow-auto">
           {memories.map((memory) => (
@@ -138,19 +154,6 @@ export function FilterPanel({ value, onChange }: FilterPanelProps) {
           ))}
         </div>
       </details>
-      {[
-        "Protection class",
-        "Screen diagonal",
-        "Screen type",
-        "Battery capacity",
-      ].map((name) => (
-        <details className="border-b border-[#ddd] pb-5" key={name}>
-          <summary className="cursor-pointer text-base font-semibold">
-            {name}
-          </summary>
-          <p className="pt-4 text-[#777]">More options coming soon.</p>
-        </details>
-      ))}
     </div>
   );
 }

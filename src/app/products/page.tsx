@@ -1,4 +1,5 @@
 import { ProductsView } from "@/modules/catalog/components/products-view";
+import { catalogService } from "@/modules/catalog/service";
 import { SiteFooter } from "@/modules/storefront/components/site-footer";
 import { SiteHeader } from "@/modules/storefront/components/site-header";
 
@@ -15,10 +16,12 @@ export default async function ProductsPage({
   }>;
 }) {
   const { q, category, brand, memory, min, max } = await searchParams;
+  const products = await catalogService.list();
   return (
     <>
       <SiteHeader />
       <ProductsView
+        products={products}
         initialQuery={q}
         initialCategory={category}
         initialFilters={{

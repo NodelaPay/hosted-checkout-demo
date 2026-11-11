@@ -8,7 +8,12 @@ export class PostgreSqlProvider implements DatabaseProvider<NodePgDatabase> {
   readonly client: NodePgDatabase;
 
   constructor(connectionString: string) {
-    this.pool = new Pool({ connectionString });
+    this.pool = new Pool({
+      connectionString,
+      max: 10,
+      idleTimeoutMillis: 30_000,
+      connectionTimeoutMillis: 5_000,
+    });
     this.client = drizzle(this.pool);
   }
 

@@ -11,19 +11,18 @@ import {
   Cpu,
   Heart,
   PackageCheck,
-  ShieldCheck,
   Smartphone,
   Truck,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, type FormEvent } from "react";
+import { z } from "zod";
 import { useCart } from "@/modules/cart-ui/cart-context";
+import { useFavorites } from "@/modules/favorites-ui/favorites-context";
 import type { ProductDto } from "../product.dto";
-import { catalogService } from "../service";
+import type { ReviewDto } from "../review.dto";
 import { ProductCard } from "@/modules/storefront/components/product-card";
 
-const colors = ["#111111", "#7430bc", "#ed1d24", "#f2bf16", "#e3e3e3"];
-const memoryOptions = ["128GB", "256GB", "512GB", "1TB"];
-const specs = [
+const featuredPhoneSpecs = [
   { label: "Screen size", value: "6.7”", icon: Smartphone },
   { label: "CPU", value: "Apple A16 Bionic", icon: Cpu },
   { label: "Number of Cores", value: "6", icon: Cpu },
@@ -32,31 +31,129 @@ const specs = [
   { label: "Battery capacity", value: "4323 mAh", icon: Battery },
 ];
 
-export function ProductDetail({ product }: { readonly product: ProductDto }) {
+const colorValues: Readonly<Record<string, string>> = {
+  "Deep Purple": "#7430bc",
+  Gold: "#c7a66c",
+  White: "#e3e3e3",
+  Blue: "#52769d",
+  Silver: "#c3c5c8",
+  Black: "#111111",
+};
+
+const reviewsResponseSchema = z.object({
+  reviews: z.array(
+    z.object({
+      id: z.uuid(),
+      productId: z.string(),
+      authorName: z.string(),
+      rating: z.number().int().min(1).max(5),
+      body: z.string(),
+      createdAt: z.string(),
+    }),
+  ),
+});
+
+export function ProductDetail({
+  product,
+  related,
+  initialReviews,
+}: {
+  readonly product: ProductDto;
+  readonly related: readonly ProductDto[];
+  readonly initialReviews: readonly ReviewDto[];
+}) {
   const { add } = useCart();
+  const { has, toggle } = useFavorites();
   const [selectedImage, setSelectedImage] = useState(0);
-  const [selectedColor, setSelectedColor] = useState(1);
-  const [selectedMemory, setSelectedMemory] = useState(product.memory ?? "1TB");
-  const [favorite, setFavorite] = useState(false);
+  const favorite = has(product.id);
   const [added, setAdded] = useState(false);
-  const gallery =
-    product.id === "iphone-14-pro-max"
-      ? [
-          product.image,
-          "/images/123-3.webp",
-          "/images/123.webp",
-          "/images/123-2.webp",
-        ]
-      : [product.image];
+  const [showAllDetails, setShowAllDetails] = useState(false);
+  const [reviews, setReviews] = useState(initialReviews);
+  const [reviewName, setReviewName] = useState("");
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewBody, setReviewBody] = useState("");
+  const [reviewMessage, setReviewMessage] = useState<string | null>(null);
+  const [reviewBusy, setReviewBusy] = useState(false);
+  const averageRating = reviews.length
+    ? (
+        reviews.reduce((sum, review) => sum + review.rating, 0) / reviews.length
+      ).toFixed(1)
+    : "0.0";
+  const featuredPhone = product.id === "iphone-14-pro-max";
+  const specs = featuredPhone
+    ? featuredPhoneSpecs
+    : [
+        { label: "Category", value: product.category, icon: PackageCheck },
+        { label: "Brand", value: product.brand, icon: PackageCheck },
+        { label: "Color", value: product.color, icon: PackageCheck },
+        ...(product.memory
+          ? [{ label: "Capacity", value: product.memory, icon: PackageCheck }]
+          : []),
+      ];
+  const detailRows = featuredPhone
+    ? [
+        ["Screen diagonal", '6.7"'],
+        ["The screen resolution", "2796 × 1290"],
+        ["The screen refresh rate", "120 Hz"],
+        ["The pixel density", "460 ppi"],
+        ["Screen type", "Super Retina XDR OLED"],
+        ["Display brightness", "2000 nits"],
+        ["Processor", "Apple A16 Bionic"],
+        ["Main camera", "48 MP"],
+        ["Front camera", "12 MP"],
+        ["Battery capacity", "4323 mAh"],
+      ]
+    : [
+        ["Category", product.category],
+        ["Brand", product.brand],
+        ["Color", product.color],
+        ...(product.memory ? [["Capacity", product.memory]] : []),
+      ];
+
+  async function submitReview(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setReviewBusy(true);
+    setReviewMessage(null);
+
+    try {
+      const response = await fetch(`/api/products/${product.id}/reviews`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          authorName: reviewName,
+          rating: reviewRating,
+          body: reviewBody,
+        }),
+      });
+      if (!response.ok) throw new Error("Could not save review");
+      const refreshed = await fetch(`/api/products/${product.id}/reviews`, {
+        cache: "no-store",
+      });
+      if (!refreshed.ok) throw new Error("Could not reload reviews");
+      const data: unknown = await refreshed.json();
+      const parsed = reviewsResponseSchema.parse(data);
+      setReviews(parsed.reviews);
+      setReviewBody("");
+      setReviewMessage("Your review has been saved.");
+    } catch {
+      setReviewMessage("Your review could not be saved. Please try again.");
+    } finally {
+      setReviewBusy(false);
+    }
+  }
+  const gallery = featuredPhone
+    ? [
+        product.image,
+        "/images/123-3.webp",
+        "/images/123.webp",
+        "/images/123-2.webp",
+      ]
+    : [product.image];
   const addToCart = () => {
     add(product);
     setAdded(true);
     window.setTimeout(() => setAdded(false), 1600);
   };
-  const related = catalogService
-    .list()
-    .filter((item) => item.id !== product.id)
-    .slice(0, 4);
 
   return (
     <main>
@@ -65,7 +162,7 @@ export function ProductDetail({ product }: { readonly product: ProductDto }) {
         <ChevronRight size={15} />
         <Link href="/products">Catalog</Link>
         <ChevronRight size={15} />
-        <span>Smartphones</span>
+        <span>{product.category}</span>
         <ChevronRight size={15} />
         <span className="font-semibold text-black">{product.name}</span>
       </div>
@@ -102,7 +199,9 @@ export function ProductDetail({ product }: { readonly product: ProductDto }) {
         </div>
         <div>
           <h1 className="text-[38px] leading-[1.13] font-semibold tracking-[-.05em] md:text-[40px]">
-            {product.name.replace(" 128GB Deep Purple", "")}
+            {featuredPhone
+              ? product.name.replace(" 128GB Deep Purple", "")
+              : product.name}
           </h1>
           <div className="mt-5 flex items-center gap-4">
             <strong className="text-[30px] font-semibold">
@@ -113,31 +212,20 @@ export function ProductDetail({ product }: { readonly product: ProductDto }) {
             )}
           </div>
           <div className="mt-5 flex items-center gap-5">
-            <span className="text-sm">Select color :</span>
-            <div className="flex gap-2">
-              {colors.map((color, index) => (
-                <button
-                  key={color}
-                  aria-label={`Color option ${index + 1}`}
-                  aria-pressed={selectedColor === index}
-                  onClick={() => setSelectedColor(index)}
-                  style={{ backgroundColor: color }}
-                  className={`h-7 w-7 rounded-full ring-offset-2 transition-transform hover:scale-110 ${selectedColor === index ? "ring-2 ring-black" : ""}`}
-                />
-              ))}
+            <span className="text-sm">Color: {product.color}</span>
+            <span
+              aria-hidden="true"
+              style={{ backgroundColor: colorValues[product.color] ?? "#888" }}
+              className="h-7 w-7 rounded-full ring-2 ring-black ring-offset-2"
+            />
+          </div>
+          {product.memory && (
+            <div className="mt-6">
+              <span className="inline-flex rounded-md border border-black px-5 py-3 text-xs md:text-sm">
+                {product.memory}
+              </span>
             </div>
-          </div>
-          <div className="mt-6 grid grid-cols-4 gap-2">
-            {memoryOptions.map((memory) => (
-              <button
-                key={memory}
-                onClick={() => setSelectedMemory(memory)}
-                className={`rounded-md border px-2 py-3 text-xs md:text-sm ${selectedMemory === memory ? "border-black text-black" : "border-[#ddd] text-[#888]"}`}
-              >
-                {memory}
-              </button>
-            ))}
-          </div>
+          )}
           <div className="mt-7 grid grid-cols-2 gap-2">
             {specs.map(({ label, value, icon: Icon }) => (
               <div
@@ -153,13 +241,13 @@ export function ProductDetail({ product }: { readonly product: ProductDto }) {
             ))}
           </div>
           <p className="mt-6 text-sm leading-6 text-[#777]">
-            Enhanced capabilities thanks to an enlarged display of 6.7 inches
-            and an incredible camera system. Capture more detail in any light,
-            and enjoy long battery life.
+            {featuredPhone
+              ? "Enhanced capabilities thanks to an enlarged display of 6.7 inches and an incredible camera system. Capture more detail in any light, and enjoy long battery life."
+              : `Explore the ${product.name}. Review its available details, save it to your favorites, or add it to your cart.`}
           </p>
           <div className="mt-7 flex gap-3">
             <button
-              onClick={() => setFavorite((value) => !value)}
+              onClick={() => toggle(product.id)}
               className="flex h-14 flex-1 items-center justify-center gap-2 rounded-md border border-black text-sm"
             >
               <Heart size={18} fill={favorite ? "black" : "none"} />
@@ -181,9 +269,9 @@ export function ProductDetail({ product }: { readonly product: ProductDto }) {
           </div>
           <div className="mt-7 grid grid-cols-3 gap-2">
             {[
-              { Icon: Truck, label: "Free Delivery", value: "1-2 day" },
-              { Icon: PackageCheck, label: "In Stock", value: "Today" },
-              { Icon: ShieldCheck, label: "Guaranteed", value: "1 year" },
+              { Icon: Truck, label: "Delivery", value: "At checkout" },
+              { Icon: PackageCheck, label: "Order", value: "Pending payment" },
+              { Icon: Heart, label: "Favorites", value: "Save for later" },
             ].map(({ Icon, label, value }) => (
               <div key={label} className="flex items-center gap-2 text-xs">
                 <span className="rounded bg-[#f6f6f6] p-2">
@@ -203,46 +291,45 @@ export function ProductDetail({ product }: { readonly product: ProductDto }) {
         <div className="mx-auto max-w-[1120px] rounded-lg bg-white px-4 py-12 md:px-10">
           <h2 className="text-2xl font-semibold">Details</h2>
           <p className="mt-6 text-sm leading-7 text-[#777]">
-            Just as a book is judged by its cover, the first thing you notice
-            when you pick up a modern smartphone is its display. Nothing
-            surprising, because advanced technologies allow you to practically
-            level the display frames and cutouts for the front camera and
-            speaker, leaving no room for bold design solutions.
+            {featuredPhone
+              ? "The iPhone 14 Pro Max combines a large display, advanced camera system, and everyday performance in a distinctive Deep Purple finish."
+              : `Available product information for the ${product.name}.`}
           </p>
-          <h3 className="mt-8 text-xl font-semibold">Screen</h3>
-          {[
-            ["Screen diagonal", '6.7"'],
-            ["The screen resolution", "2796 × 1290"],
-            ["The screen refresh rate", "120 Hz"],
-            ["The pixel density", "460 ppi"],
-            ["Screen type", "Super Retina XDR OLED"],
-            ["Display brightness", "2000 nits"],
-            ["Processor", "Apple A16 Bionic"],
-            ["Main camera", "48 MP"],
-            ["Front camera", "12 MP"],
-            ["Battery capacity", "4323 mAh"],
-          ].map(([label, value]) => (
-            <div
-              className="flex justify-between border-b border-[#eee] py-4 text-sm"
-              key={label}
+          <h3 className="mt-8 text-xl font-semibold">
+            {featuredPhone ? "Screen" : "Specifications"}
+          </h3>
+          {detailRows
+            .slice(0, showAllDetails ? undefined : 6)
+            .map(([label, value]) => (
+              <div
+                className="flex justify-between border-b border-[#eee] py-4 text-sm"
+                key={label}
+              >
+                <span>{label}</span>
+                <span>{value}</span>
+              </div>
+            ))}
+          {detailRows.length > 6 && (
+            <button
+              onClick={() => setShowAllDetails((current) => !current)}
+              className="mt-8 flex w-full items-center justify-center gap-2 rounded border border-[#ddd] py-3 text-sm"
             >
-              <span>{label}</span>
-              <span>{value}</span>
-            </div>
-          ))}
-          <button className="mt-8 flex w-full items-center justify-center gap-2 rounded border border-[#ddd] py-3 text-sm">
-            View More
-            <ChevronDown size={16} />
-          </button>
+              {showAllDetails ? "View Less" : "View More"}
+              <ChevronDown size={16} />
+            </button>
+          )}
         </div>
       </section>
       <section className="mx-auto min-h-[2446px] max-w-[1120px] px-4 py-20 md:min-h-[1448px] lg:px-0">
         <h2 className="text-2xl font-semibold">Reviews</h2>
         <div className="mt-8 rounded-lg bg-[#fafafa] p-7">
           <div className="flex items-center gap-6">
-            <span className="text-[48px] font-semibold">4.8</span>
+            <span className="text-[48px] font-semibold">{averageRating}</span>
             <div>
-              <p className="text-sm text-[#888]">of 125 reviews</p>
+              <p className="text-sm text-[#888]">
+                of {reviews.length}{" "}
+                {reviews.length === 1 ? "review" : "reviews"}
+              </p>
               <p className="text-[#ffb547]">★★★★★</p>
             </div>
           </div>
@@ -253,45 +340,76 @@ export function ProductDetail({ product }: { readonly product: ProductDto }) {
                 <span
                   className="block h-full rounded bg-[#ffb547]"
                   style={{
-                    width: `${stars === 5 ? 80 : stars === 4 ? 45 : stars === 3 ? 15 : 6}%`,
+                    width: `${reviews.length ? (reviews.filter((review) => review.rating === stars).length / reviews.length) * 100 : 0}%`,
                   }}
                 />
               </span>
             </div>
           ))}
         </div>
-        <textarea
-          aria-label="Write a review"
-          placeholder="Leave a review"
-          className="mt-8 w-full rounded-lg border border-[#ddd] p-4 outline-none focus:border-black"
-          rows={3}
-        />
+        <form
+          onSubmit={(event) => void submitReview(event)}
+          className="mt-8 grid gap-3"
+        >
+          <div className="flex flex-wrap gap-3">
+            <input
+              required
+              minLength={2}
+              maxLength={80}
+              aria-label="Your name"
+              placeholder="Your name"
+              value={reviewName}
+              onChange={(event) => setReviewName(event.target.value)}
+              className="h-12 flex-1 rounded-lg border border-[#ddd] px-4 outline-none focus:border-black"
+            />
+            <select
+              aria-label="Rating"
+              value={reviewRating}
+              onChange={(event) => setReviewRating(Number(event.target.value))}
+              className="h-12 rounded-lg border border-[#ddd] px-4"
+            >
+              {[5, 4, 3, 2, 1].map((rating) => (
+                <option key={rating} value={rating}>
+                  {rating} stars
+                </option>
+              ))}
+            </select>
+          </div>
+          <textarea
+            required
+            minLength={10}
+            maxLength={2000}
+            aria-label="Write a review"
+            placeholder="Leave a review"
+            value={reviewBody}
+            onChange={(event) => setReviewBody(event.target.value)}
+            className="w-full rounded-lg border border-[#ddd] p-4 outline-none focus:border-black"
+            rows={3}
+          />
+          <button
+            type="submit"
+            disabled={reviewBusy}
+            className="justify-self-start rounded-lg bg-black px-6 py-3 text-sm text-white disabled:opacity-40"
+          >
+            {reviewBusy ? "Saving…" : "Post review"}
+          </button>
+          {reviewMessage && (
+            <p role="status" className="text-sm">
+              {reviewMessage}
+            </p>
+          )}
+        </form>
         <div className="mt-8 space-y-4">
-          {[
-            "This phone is amazing. The camera and battery life are excellent.",
-            "Beautiful display and a premium feel. Very happy with it.",
-            "Excellent performance and fast delivery.",
-            "I love the color and the screen is incredibly sharp.",
-            "The photos look great even in low light.",
-            "Everything feels fast and polished. Recommended.",
-          ].map((review, index) => (
-            <div className="rounded-lg bg-[#fafafa] p-6" key={review}>
+          {reviews.map((review) => (
+            <div className="rounded-lg bg-[#fafafa] p-6" key={review.id}>
               <div className="flex justify-between">
-                <strong>
-                  {
-                    [
-                      "Alex M.",
-                      "Olivia R.",
-                      "Sam K.",
-                      "Taylor P.",
-                      "Jordan L.",
-                      "Casey D.",
-                    ][index]
-                  }
-                </strong>
-                <span className="text-[#ffb547]">★★★★★</span>
+                <strong>{review.authorName}</strong>
+                <span className="text-[#ffb547]">
+                  {"★".repeat(review.rating)}
+                  {"☆".repeat(5 - review.rating)}
+                </span>
               </div>
-              <p className="mt-3 text-sm text-[#555]">{review}</p>
+              <p className="mt-3 text-sm text-[#555]">{review.body}</p>
             </div>
           ))}
         </div>

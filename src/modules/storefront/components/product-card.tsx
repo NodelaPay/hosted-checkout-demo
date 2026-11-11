@@ -6,10 +6,12 @@ import { Heart } from "lucide-react";
 import { useState } from "react";
 import type { ProductDto } from "@/modules/catalog/product.dto";
 import { useCart } from "@/modules/cart-ui/cart-context";
+import { useFavorites } from "@/modules/favorites-ui/favorites-context";
 
 export function ProductCard({ product }: { readonly product: ProductDto }) {
   const { add } = useCart();
-  const [favorite, setFavorite] = useState(false);
+  const { has, toggle } = useFavorites();
+  const favorite = has(product.id);
   const [added, setAdded] = useState(false);
   const addToCart = () => {
     add(product);
@@ -26,7 +28,7 @@ export function ProductCard({ product }: { readonly product: ProductDto }) {
             : `Add ${product.shortName} to favorites`
         }
         aria-pressed={favorite}
-        onClick={() => setFavorite((value) => !value)}
+        onClick={() => toggle(product.id)}
         className="absolute right-4 top-4 z-10 text-[#b6b6b6] transition-colors hover:text-red-500"
       >
         <Heart

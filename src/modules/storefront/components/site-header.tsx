@@ -33,8 +33,10 @@ const mobileLinks = [
   { label: "Products", href: "/products" },
   { label: "Shopping Cart", href: "/cart" },
   { label: "Favorites", href: "/favorites" },
+  { label: "Account", href: "/account" },
   { label: "About", href: "/about" },
   { label: "Contact Us", href: "/contact" },
+  { label: "Blog", href: "/blog" },
 ];
 
 export function Logo({ inverse = false }: { readonly inverse?: boolean }) {

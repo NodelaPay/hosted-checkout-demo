@@ -1,143 +1,68 @@
+import { z } from "zod";
+import type { CacheProvider } from "@/infrastructure/cache/contract";
+import { CacheProviderFactory } from "@/infrastructure/cache/factory";
 import type { ProductDto } from "./product.dto";
+import type { ProductRepository } from "./repository.contract";
+import { ProductRepositoryFactory } from "./repository.factory";
 
-const products: readonly ProductDto[] = [
-  {
-    id: "iphone-14-pro-max",
-    name: "Apple iPhone 14 Pro Max 128GB Deep Purple",
-    shortName: "Apple iPhone 14 Pro Max 128GB",
-    price: 1399,
-    oldPrice: 1499,
-    image: "/images/iphone-14-pro-max.png",
-    category: "Phones",
-    brand: "Apple",
-    color: "Deep Purple",
-    memory: "128GB",
-  },
-  {
-    id: "iphone-14-pro-gold",
-    name: "Apple iPhone 14 Pro 512GB Gold",
-    shortName: "Apple iPhone 14 Pro 512GB Gold",
-    price: 1437,
-    image: "/images/iphone-14-gold.png",
-    category: "Phones",
-    brand: "Apple",
-    color: "Gold",
-    memory: "512GB",
-  },
-  {
-    id: "iphone-11-white",
-    name: "Apple iPhone 11 128GB White",
-    shortName: "Apple iPhone 11 128GB White",
-    price: 510,
-    image: "/images/iphone-11-white.png",
-    category: "Phones",
-    brand: "Apple",
-    color: "White",
-    memory: "128GB",
-  },
-  {
-    id: "iphone-11-blue",
-    name: "Apple iPhone 11 128GB Blue",
-    shortName: "Apple iPhone 11 128GB Blue",
-    price: 550,
-    image: "/images/123.webp",
-    category: "Phones",
-    brand: "Apple",
-    color: "Blue",
-    memory: "128GB",
-  },
-  {
-    id: "iphone-14-pro-blue",
-    name: "Apple iPhone 14 Pro 1TB Blue",
-    shortName: "Apple iPhone 14 Pro 1TB Blue",
-    price: 1499,
-    image: "/images/123-3.webp",
-    category: "Phones",
-    brand: "Apple",
-    color: "Blue",
-    memory: "1TB",
-  },
-  {
-    id: "iphone-14-pro-purple",
-    name: "Apple iPhone 14 Pro 128GB Deep Purple",
-    shortName: "Apple iPhone 14 Pro 128GB",
-    price: 1600,
-    image: "/images/iphone-14-pro-max.png",
-    category: "Phones",
-    brand: "Apple",
-    color: "Deep Purple",
-    memory: "128GB",
-  },
-  {
-    id: "airpods-max",
-    name: "AirPods Max Silver",
-    shortName: "AirPods Max Silver",
-    price: 549,
-    image: "/images/101.webp",
-    category: "Headphones",
-    brand: "Apple",
-    color: "Silver",
-  },
-  {
-    id: "watch-series-9",
-    name: "Apple Watch Series 9 GPS 41mm Starlight Aluminium",
-    shortName: "Apple Watch Series 9 GPS",
-    price: 399,
-    image: "/images/106.webp",
-    category: "Smart Watches",
-    brand: "Apple",
-    color: "Starlight",
-  },
-  {
-    id: "airpods-pro",
-    name: "Apple AirPods Pro Wireless Earbuds",
-    shortName: "Apple AirPods Pro",
-    price: 249,
-    image: "/images/100.webp",
-    category: "Headphones",
-    brand: "Apple",
-    color: "White",
-  },
-  {
-    id: "macbook-pro",
-    name: "Apple MacBook Pro 14 Inch Space Grey",
-    shortName: "MacBook Pro 14 Inch",
-    price: 1999,
-    image: "/images/78.webp",
-    category: "Computers",
-    brand: "Apple",
-    color: "Space Grey",
-  },
-  {
-    id: "homepod-mini",
-    name: "Apple HomePod Mini Cosmic Grey",
-    shortName: "HomePod Mini",
-    price: 129,
-    image: "/images/103.webp",
-    category: "Accessories",
-    brand: "Apple",
-    color: "Cosmic Grey",
-  },
-  {
-    id: "samsung-galaxy",
-    name: "Samsung Galaxy S10 128GB Black",
-    shortName: "Samsung Galaxy S10",
-    price: 699,
-    image: "/images/133.webp",
-    category: "Phones",
-    brand: "Samsung",
-    color: "Black",
-    memory: "128GB",
-  },
-];
+const productSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  shortName: z.string(),
+  price: z.number().int(),
+  oldPrice: z.number().int().optional(),
+  image: z.string(),
+  category: z.enum([
+    "Phones",
+    "Computers",
+    "Smart Watches",
+    "Headphones",
+    "Accessories",
+  ]),
+  brand: z.string(),
+  color: z.string(),
+  memory: z.string().optional(),
+});
 
-export class CatalogService {
-  list(): readonly ProductDto[] {
+export interface CatalogServiceContract {
+  list(): Promise<readonly ProductDto[]>;
+  getById(id: string): Promise<ProductDto | undefined>;
+}
+
+export class CatalogService implements CatalogServiceContract {
+  constructor(
+    private readonly repository: ProductRepository,
+    private readonly cache: CacheProvider,
+  ) {}
+
+  async list(): Promise<readonly ProductDto[]> {
+    const cacheKey = "catalog:products:v1";
+    try {
+      const cached = await this.cache.get(cacheKey);
+      if (cached) {
+        const parsed = z.array(productSchema).safeParse(JSON.parse(cached));
+        if (parsed.success) return parsed.data;
+      }
+    } catch (error) {
+      console.error("Catalog cache read failed", error);
+    }
+
+    const products = await this.repository.list();
+    try {
+      await this.cache.set(cacheKey, JSON.stringify(products), 60);
+    } catch (error) {
+      console.error("Catalog cache write failed", error);
+    }
     return products;
   }
-  getById(id: string): ProductDto | undefined {
+
+  async getById(id: string): Promise<ProductDto | undefined> {
+    const products = await this.list();
     return products.find((product) => product.id === id);
   }
 }
 
-export const catalogService = new CatalogService();
+export const catalogService: CatalogServiceContract = new CatalogService(
+  ProductRepositoryFactory.create(),
+  CacheProviderFactory.create(),
+);

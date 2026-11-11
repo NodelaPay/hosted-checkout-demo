@@ -16,6 +16,8 @@ import { SectionHeading } from "@/modules/storefront/components/section-heading"
 import { SiteFooter } from "@/modules/storefront/components/site-footer";
 import { SiteHeader } from "@/modules/storefront/components/site-header";
 
+export const dynamic = "force-dynamic";
+
 const categories = [
   { name: "Phones", icon: Smartphone },
   { name: "Smart Watches", icon: Watch },
@@ -75,8 +77,8 @@ function BannerCard({
   );
 }
 
-export default function HomePage() {
-  const products = catalogService.list();
+export default async function HomePage() {
+  const products = await catalogService.list();
   return (
     <>
       <SiteHeader />
