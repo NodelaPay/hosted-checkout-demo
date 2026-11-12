@@ -10,7 +10,13 @@ Requires Node.js 20.9 or newer, npm, and Docker. The project's containers bind t
 cp .env.example .env.local
 ```
 
-Set `SESSION_SECRET` in `.env.local` to a random value of at least 32 characters. You can generate one with `openssl rand -hex 32`. Then run:
+Set `SESSION_SECRET` in `.env.local` to a random value of at least 32 characters. You can generate one with `openssl rand -hex 32`.
+
+Set `NODELA_API_KEY` to a Nodela test key and `APP_BASE_URL` to the public origin used for payment redirects. For local development, `http://localhost:3000` works for browser redirects. A Nodela webhook needs a publicly reachable URL registered in the Nodela dashboard; set `NODELA_WEBHOOK_SECRET` only after registering it. The webhook endpoint is `/api/payments/webhook`.
+
+Set `NODELA_DEBUG=true` to log Nodela requests and responses in the server terminal. API keys, client secrets, customer names, email addresses, and wallet addresses are redacted. Restart the app after changing `.env.local`.
+
+Then run:
 
 ```bash
 npm install
@@ -27,16 +33,16 @@ Open <http://localhost:3000>. The seed command is safe to rerun; it updates its 
 - Products and journal posts are read from PostgreSQL. Their public lists are cached in Redis for 60 seconds.
 - A signed, HTTP-only guest cookie identifies each browser's cart, favorites, checkout draft, addresses, and orders. No account registration or sign-in is configured.
 - Cart quantities, favorites, addresses, shipping choices, promo code `CYBER10`, product reviews, and contact submissions persist in PostgreSQL.
-- Checkout calculates totals on the server and creates an idempotent order with status `pending_payment`. The payment screen does not collect card details or charge anyone. Payment provider integration is intentionally left open.
+- Checkout calculates the displayed USD total on the server, creates an idempotent order, and creates a Nodela invoice. The customer completes payment on Nodela's hosted checkout. The return screen and optional signed webhook verify the invoice with Nodela before the order becomes `paid`.
 - Order history for the current guest session appears on `/account`.
 
 ## Routes
 
-| Screens    | Paths                                                                                 |
-| ---------- | ------------------------------------------------------------------------------------- |
-| Storefront | `/`, `/products`, `/products/[id]`, `/products/filters`                               |
-| Shopping   | `/cart`, `/favorites`, `/checkout/address`, `/checkout/shipping`, `/checkout/payment` |
-| Content    | `/about`, `/contact`, `/blog`, `/blog/[slug]`, `/account`                             |
+| Screens    | Paths                                                                                                                         |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Storefront | `/`, `/products`, `/products/[id]`, `/products/filters`                                                                       |
+| Shopping   | `/cart`, `/favorites`, `/checkout/address`, `/checkout/shipping`, `/checkout/payment`, `/checkout/return`, `/checkout/cancel` |
+| Content    | `/about`, `/contact`, `/blog`, `/blog/[slug]`, `/account`                                                                     |
 
 The JSON API lives under `/api`. Catalog and blog GET routes are public; mutation routes validate input and use Redis rate limits. Guest data is scoped to the signed cookie. Use `npm run test:smoke` while the app is running to exercise the main API flow.
 The smoke command writes sample orders, a contact message, and a review to the connected database.
@@ -49,6 +55,7 @@ npm run typecheck
 npm run lint
 npm run build
 npm run test:smoke
+npm run test:payment
 npm run db:generate
 npm run db:migrate
 npm run db:seed

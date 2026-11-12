@@ -176,4 +176,24 @@ export class PostgreSqlCheckoutRepository implements CheckoutRepository {
       .orderBy(desc(ordersTable.createdAt));
     return rows.map(toOrder);
   }
+
+  async getOrder(
+    guestId: string,
+    orderId: string,
+  ): Promise<OrderDto | undefined> {
+    const [row] = await this.database
+      .select()
+      .from(ordersTable)
+      .where(and(eq(ordersTable.guestId, guestId), eq(ordersTable.id, orderId)))
+      .limit(1);
+
+    return row ? toOrder(row) : undefined;
+  }
+
+  async markOrderPaid(orderId: string): Promise<void> {
+    await this.database
+      .update(ordersTable)
+      .set({ status: "paid" })
+      .where(eq(ordersTable.id, orderId));
+  }
 }

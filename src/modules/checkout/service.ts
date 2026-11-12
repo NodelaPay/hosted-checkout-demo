@@ -31,6 +31,8 @@ export interface CheckoutServiceContract {
   quote(guestId: string): Promise<OrderQuoteDto>;
   createOrder(guestId: string, idempotencyKey: string): Promise<OrderDto>;
   listOrders(guestId: string): Promise<readonly OrderDto[]>;
+  getOrder(guestId: string, orderId: string): Promise<OrderDto | undefined>;
+  markOrderPaid(orderId: string): Promise<void>;
 }
 
 export class CheckoutService implements CheckoutServiceContract {
@@ -170,6 +172,14 @@ export class CheckoutService implements CheckoutServiceContract {
 
   listOrders(guestId: string): Promise<readonly OrderDto[]> {
     return this.repository.listOrders(guestId);
+  }
+
+  getOrder(guestId: string, orderId: string): Promise<OrderDto | undefined> {
+    return this.repository.getOrder(guestId, orderId);
+  }
+
+  markOrderPaid(orderId: string): Promise<void> {
+    return this.repository.markOrderPaid(orderId);
   }
 }
 

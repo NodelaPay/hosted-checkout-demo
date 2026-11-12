@@ -14,6 +14,7 @@
     "db:migrate": "drizzle-kit migrate",
     "db:seed": "tsx scripts/seed.ts",
     "test:smoke": "tsx scripts/smoke.ts",
+    "test:payment": "node --env-file=.env.local --import tsx --test scripts/payment.test.ts",
     "db:studio": "drizzle-kit studio"
   },
   "engines": {

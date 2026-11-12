@@ -10,7 +10,7 @@ const ordersResponseSchema = z.object({
   orders: z.array(
     z.object({
       id: z.uuid(),
-      status: z.literal("pending_payment"),
+      status: z.enum(["pending_payment", "paid"]),
       total: z.number(),
       createdAt: z.string(),
       items: z.array(z.object({ name: z.string(), quantity: z.number() })),
@@ -50,8 +50,7 @@ export function OrdersView() {
         <div className="mt-6 rounded-2xl bg-[#f6f6f6] p-8">
           <Package size={30} strokeWidth={1.5} />
           <p className="mt-5 text-sm leading-7 text-[#666]">
-            No orders yet. Find something you like and create a pending order
-            through the checkout flow.
+            No orders yet. Find something you like and check out.
           </p>
           <Link
             href="/products"
@@ -75,7 +74,7 @@ export function OrdersView() {
                 </p>
               </div>
               <span className="rounded-full bg-[#f6f6f6] px-3 py-2 text-xs">
-                Pending payment
+                {order.status === "paid" ? "Paid" : "Pending payment"}
               </span>
             </div>
             <p className="mt-4 text-sm leading-6 text-[#666]">
@@ -84,6 +83,14 @@ export function OrdersView() {
                 .join(", ")}
             </p>
             <p className="mt-4 font-semibold">Total ${order.total}</p>
+            {order.status === "pending_payment" && (
+              <Link
+                href={`/checkout/return?orderId=${order.id}`}
+                className="mt-4 inline-block text-sm font-semibold underline"
+              >
+                Check payment status
+              </Link>
+            )}
           </article>
         ))}
       </div>

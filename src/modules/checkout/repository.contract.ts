@@ -20,4 +20,6 @@ export interface CheckoutRepository {
     idempotencyKey: string,
   ): Promise<OrderDto | undefined>;
   listOrders(guestId: string): Promise<readonly OrderDto[]>;
+  getOrder(guestId: string, orderId: string): Promise<OrderDto | undefined>;
+  markOrderPaid(orderId: string): Promise<void>;
 }

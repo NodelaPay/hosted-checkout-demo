@@ -3,15 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import {
-  CheckCircle2,
-  CreditCard,
-  MapPin,
-  Pencil,
-  Plus,
-  Truck,
-  X,
-} from "lucide-react";
+import { CreditCard, MapPin, Pencil, Plus, Truck, X } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { z } from "zod";
 import { ensureGuestSession } from "@/infrastructure/http/client-session";
@@ -37,11 +29,18 @@ const checkoutResponseSchema = z.object({
   }),
 });
 
-const orderResponseSchema = z.object({
-  order: z.object({
-    id: z.uuid(),
-    status: z.literal("pending_payment"),
-    total: z.number(),
+const paymentResponseSchema = z.object({
+  payment: z.object({
+    orderId: z.uuid(),
+    checkoutUrl: z.url().nullable(),
+    status: z.enum([
+      "creating",
+      "failed",
+      "pending",
+      "paid",
+      "cancelled",
+      "expired",
+    ]),
   }),
 });
 
@@ -455,9 +454,10 @@ function PaymentStep({
   error,
   setError,
 }: CheckoutStepProps & { readonly products: readonly ProductDto[] }) {
-  const { items, refresh } = useCart();
+  const router = useRouter();
+  const { items } = useCart();
   const [busy, setBusy] = useState(false);
-  const [orderId, setOrderId] = useState<string | null>(null);
+  const [customer, setCustomer] = useState({ name: "", email: "" });
   const [quote, setQuote] = useState<OrderQuoteDto | null>(null);
   const idempotencyKey = useRef<string | null>(null);
   const address = data.addresses.find(
@@ -489,56 +489,55 @@ function PaymentStep({
     };
   }, [setError]);
 
-  async function createOrder() {
+  async function startPayment() {
     setBusy(true);
     setError(null);
-    idempotencyKey.current ??= crypto.randomUUID();
+    idempotencyKey.current ??=
+      sessionStorage.getItem("checkout-payment-key") ?? crypto.randomUUID();
+    sessionStorage.setItem("checkout-payment-key", idempotencyKey.current);
 
     try {
-      const response = await fetch("/api/orders", {
+      const validatedCustomer = z
+        .object({ name: z.string().trim().min(1), email: z.email() })
+        .parse(customer);
+      const response = await fetch("/api/payments", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ idempotencyKey: idempotencyKey.current }),
+        body: JSON.stringify({
+          idempotencyKey: idempotencyKey.current,
+          customer: validatedCustomer,
+        }),
       });
       if (!response.ok) {
         const body = await response.json();
         const parsed = z.object({ error: z.string() }).safeParse(body);
         throw new Error(
-          parsed.success ? parsed.data.error : "Order could not be created",
+          parsed.success ? parsed.data.error : "Payment could not be started",
         );
       }
 
-      const result = orderResponseSchema.parse(await response.json());
-      setOrderId(result.order.id);
-      await refresh();
+      const result = paymentResponseSchema.parse(await response.json());
+      if (result.payment.status === "paid") {
+        router.push(`/checkout/return?orderId=${result.payment.orderId}`);
+        return;
+      }
+      if (!result.payment.checkoutUrl) {
+        throw new Error(
+          "Invoice is still being created. Please try again shortly.",
+        );
+      }
+      window.location.assign(result.payment.checkoutUrl);
     } catch (cause) {
       setError(
-        cause instanceof Error ? cause.message : "Order could not be created",
+        cause instanceof z.ZodError
+          ? "Enter your name and a valid email address."
+          : cause instanceof Error
+            ? cause.message
+            : "Payment could not be started",
       );
     } finally {
       setBusy(false);
     }
-  }
-
-  if (orderId) {
-    return (
-      <div className="mx-auto max-w-[720px] px-4 pb-24 text-center">
-        <CheckCircle2 size={54} strokeWidth={1.3} className="mx-auto" />
-        <h1 className="mt-7 text-4xl font-light tracking-[-0.05em]">
-          Your order is ready.
-        </h1>
-        <p className="mt-4 leading-7 text-[#666]">
-          Order {orderId.slice(0, 8)} is saved as pending payment. No charge has
-          been made. Payment provider integration will be added separately.
-        </p>
-        <Link
-          href="/account"
-          className="mt-8 inline-flex rounded-md bg-black px-8 py-4 text-sm text-white"
-        >
-          View your orders
-        </Link>
-      </div>
-    );
   }
 
   return (
@@ -612,13 +611,37 @@ function PaymentStep({
         <div className="rounded-lg bg-[#f6f6f6] p-8">
           <CreditCard size={34} strokeWidth={1.4} />
           <h2 className="mt-6 text-2xl font-light tracking-[-0.04em]">
-            Payment integration is ready for your provider.
+            Pay securely with crypto
           </h2>
           <p className="mt-4 text-sm leading-7 text-[#666]">
-            Continue to save this order with its address, items, shipping, and
-            totals. It will remain pending payment. No card details are
-            collected and no charge is made.
+            Continue to Nodela to choose your network and cryptocurrency. Your
+            order will be confirmed after payment is verified.
           </p>
+        </div>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2">
+          <label className="grid gap-2 text-sm font-medium">
+            Full name
+            <input
+              autoComplete="name"
+              value={customer.name}
+              onChange={(event) =>
+                setCustomer({ ...customer, name: event.target.value })
+              }
+              className="h-12 rounded-md border border-[#ddd] px-4 outline-none focus:border-black"
+            />
+          </label>
+          <label className="grid gap-2 text-sm font-medium">
+            Email address
+            <input
+              type="email"
+              autoComplete="email"
+              value={customer.email}
+              onChange={(event) =>
+                setCustomer({ ...customer, email: event.target.value })
+              }
+              className="h-12 rounded-md border border-[#ddd] px-4 outline-none focus:border-black"
+            />
+          </label>
         </div>
         {error && (
           <p role="alert" className="mt-5 text-sm text-red-700">
@@ -633,11 +656,11 @@ function PaymentStep({
             Back
           </Link>
           <button
-            onClick={() => void createOrder()}
+            onClick={() => void startPayment()}
             disabled={busy || lines.length === 0 || !address || !quote}
             className="h-14 flex-1 rounded-md bg-black text-sm text-white disabled:opacity-40"
           >
-            {busy ? "Saving order…" : "Create pending order"}
+            {busy ? "Preparing checkout…" : "Pay with crypto"}
           </button>
         </div>
       </section>

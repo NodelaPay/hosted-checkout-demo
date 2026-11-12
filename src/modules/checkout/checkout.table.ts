@@ -16,7 +16,10 @@ export const shippingMethodEnum = pgEnum("shipping_method", [
   "schedule",
 ]);
 
-export const orderStatusEnum = pgEnum("order_status", ["pending_payment"]);
+export const orderStatusEnum = pgEnum("order_status", [
+  "pending_payment",
+  "paid",
+]);
 
 export const addressesTable = pgTable("checkout_addresses", {
   id: uuid("id").defaultRandom().primaryKey(),

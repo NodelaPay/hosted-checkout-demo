@@ -38,7 +38,7 @@ export interface OrderQuoteDto {
 
 export interface OrderDto {
   readonly id: string;
-  readonly status: "pending_payment";
+  readonly status: "pending_payment" | "paid";
   readonly address: AddressDto;
   readonly items: readonly OrderItemDto[];
   readonly shippingMethod: z.infer<typeof shippingMethodSchema>;

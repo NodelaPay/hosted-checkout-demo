@@ -7,5 +7,5 @@
 - Use strict TypeScript. Avoid `any` and unchecked casts. Use classes where they improve cohesion, lifecycle management, or dependency injection; simple pure helpers may remain functions.
 - Keep controllers thin: parse input, call a service, and map its result to HTTP. Put business rules in services and persistence details in repositories.
 - Add module tables to the Drizzle schema glob and commit generated migrations with schema changes.
-- The storefront uses PostgreSQL for products, blog posts, reviews, guest carts, favorites, addresses, contact messages, and pending orders. Redis provides caching and rate limiting.
-- No payment provider is connected. Orders remain pending payment, and card details must not be collected until a payment provider is integrated.
+- The storefront uses PostgreSQL for products, blog posts, reviews, guest carts, favorites, addresses, contact messages, orders, and payments. Redis provides caching and rate limiting.
+- Nodela owns the hosted crypto checkout. The payments module creates invoices and verifies settlement server-side before the checkout module marks an order paid. Never expose the API key or trust redirect query parameters as proof of payment.
